@@ -38,7 +38,7 @@
         <GLM6B>
             <property>
                 <name>Path</name>
-                <value>THUDM/chatglm-6b-int8</value>
+                <value>/content/chatglm-6b</value>
                 <description>glm模型位置</description>
             </property>
             <property>
