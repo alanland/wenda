@@ -322,5 +322,6 @@ t2.start()
 t1.join()
 t2.join()
 
-# both threads completely executed
+print("Done!" * 100)
 print("Done!")
+print("Done!" * 100)
