@@ -304,4 +304,23 @@ def pathinfo_adjust_wrapper(func):
     return _
 bottle.Bottle._handle = pathinfo_adjust_wrapper(bottle.Bottle._handle)#修复bottle在处理utf8 url时的bug
 
-bottle.run(server='paste', host="0.0.0.0", port=settings.Port, quiet=True)
+
+import threading
+def run_bottle(port):
+    bottle.run(server='paste', host="0.0.0.0", port=settings.Port, quiet=True)
+
+def run_cpolar(port):
+    import subprocess
+    subprocess.run('cpolar http %s' %  port, shell=True)
+
+t1 = threading.Thread(target=run_bottle, args=(17860,))
+t2 = threading.Thread(target=run_cpolar, args=(17860,))
+
+t1.start()
+t2.start()
+
+t1.join()
+t2.join()
+
+# both threads completely executed
+print("Done!")
