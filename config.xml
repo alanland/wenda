@@ -165,7 +165,7 @@
             </property>
             <property>
                 <name>Model_Path</name>
-                <value>model/text2vec-large-chinese</value>
+                <value>GanymedeNil/text2vec-large-chinese</value>
                 <description>向量模型存储路径</description>
             </property>
             <property>
