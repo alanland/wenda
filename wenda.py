@@ -317,9 +317,9 @@ t1 = threading.Thread(target=run_bottle, args=(17860,))
 t1.start()
 t1.join()
 
-# t2 = threading.Thread(target=run_cpolar, args=(17860,))
-# t2.start()
-# t2.join()
+t2 = threading.Thread(target=run_cpolar, args=(17860,))
+t2.start()
+t2.join()
 
 
 print("Done!" * 100)
