@@ -315,11 +315,12 @@ def run_cpolar(port):
 
 t2 = threading.Thread(target=run_cpolar, args=(17860,))
 t2.start()
-t2.join()
 
 
 t1 = threading.Thread(target=run_bottle, args=(17860,))
 t1.start()
+
+t2.join()
 t1.join()
 
 print("Done!" * 100)
