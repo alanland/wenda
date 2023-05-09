@@ -311,16 +311,16 @@ def run_bottle(port):
 
 def run_cpolar(port):
     import subprocess
-    subprocess.run('cpolar http %s' %  port, shell=True)
-
-t1 = threading.Thread(target=run_bottle, args=(17860,))
-t1.start()
-t1.join()
+    subprocess.run('cpolar http %s' % port, shell=True)
 
 t2 = threading.Thread(target=run_cpolar, args=(17860,))
 t2.start()
 t2.join()
 
+
+t1 = threading.Thread(target=run_bottle, args=(17860,))
+t1.start()
+t1.join()
 
 print("Done!" * 100)
 print("Done!")
