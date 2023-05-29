@@ -3,14 +3,14 @@ from langchain.embeddings import HuggingFaceEmbeddings
 import sentence_transformers
 import numpy as np
 import re,os
-from plugins.common import settings
+from plugins.common import settings,allowCROS
 from plugins.common import error_helper 
 from plugins.common import success_print 
 divider='\n'
 
 if not os.path.exists('memory'):
     os.mkdir('memory')
-cunnrent_setting=settings.library.rtst
+cunnrent_setting=settings.librarys.rtst
 def get_doc_by_id(id,memory_name):
     return vectorstores[memory_name].docstore.search(vectorstores[memory_name].index_to_docstore_id[id])
 
@@ -54,7 +54,7 @@ def get_doc(id,score,step,memory_name):
 def find(s,step = 0,memory_name="default"):
     try:
         embedding = get_vectorstore(memory_name).embedding_function(s)
-        scores, indices = vectorstores[memory_name].index.search(np.array([embedding], dtype=np.float32), int(cunnrent_setting.Count))
+        scores, indices = vectorstores[memory_name].index.search(np.array([embedding], dtype=np.float32), int(cunnrent_setting.count))
         docs = []
         for j, i in enumerate(indices[0]):
             if i == -1:
@@ -68,10 +68,10 @@ def find(s,step = 0,memory_name="default"):
         return []
 try:
     embeddings = HuggingFaceEmbeddings(model_name='')
-    embeddings.client = sentence_transformers.SentenceTransformer(cunnrent_setting.Model_Path,
-                                                                            device=cunnrent_setting.Device)
+    embeddings.client = sentence_transformers.SentenceTransformer(cunnrent_setting.model_path,
+                                                                            device=cunnrent_setting.device)
 except Exception  as e:
-    error_helper("embedding加载失败，请下载相应模型",r"https://github.com/l15y/wenda#st%E6%A8%A1%E5%BC%8F")
+    error_helper("embedding加载失败，请下载语义知识库计算模型",r"https://github.com/l15y/wenda#st%E6%A8%A1%E5%BC%8F")
     raise e
 vectorstores={}
 def get_vectorstore(memory_name):
@@ -132,13 +132,26 @@ import json
 @route('/api/find_rtst_in_memory', method=("POST","OPTIONS"))
 def api_find():
     allowCROS()
-    data = request.json
-    prompt = data.get('prompt')
-    step = data.get('step')
-    memory_name=data.get("memory_name")
-    if step is None:
-        step = int(settings.library.Step)
-    return json.dumps(find(prompt,int(step),memory_name))
+    try:
+        data = request.json
+        prompt = data.get('prompt')
+        step = data.get('step')
+        memory_name=data.get("memory_name")
+        if step is None:
+            step = int(settings.library.step)
+        return json.dumps(find(prompt,int(step),memory_name))
+    except Exception as e:
+        return str(e)
+    
+@route('/api/del_rtst_in_memory', method=("POST","OPTIONS"))
+def api_find():
+    allowCROS()
+    try:
+        data = request.json
+        memory_name=data.get("memory_name")
+        del vectorstores[memory_name]
+    except Exception as e:
+        return str(e)
 
 @route('/api/save_news', method=("POST","OPTIONS"))
 def save_news():
@@ -161,9 +174,3 @@ def save_news():
 def read_news(path=""):
     allowCROS()
     return static_file(path, root="txt/")
-
-def allowCROS():
-    response.set_header('Access-Control-Allow-Origin', '*')
-    response.add_header('Access-Control-Allow-Methods', 'POST,OPTIONS')
-    response.add_header('Access-Control-Allow-Headers',
-                        'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token')

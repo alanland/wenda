@@ -23,6 +23,7 @@ WPy64-*
 
 *.bin
 vectorstore_path*
-config.xml
+config.yml
 memory
 .history
+*.zip

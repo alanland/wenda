@@ -14,19 +14,7 @@ import sys
 import time
 os.chdir(sys.path[0][:-8])
 
-parser = argparse.ArgumentParser(description='Wenda config')
-parser.add_argument('-c', type=str, dest="Config",
-                    default='config.xml', help="配置文件")
-parser.add_argument('-p', type=int, dest="Port", help="使用端口号")
-parser.add_argument('-l', type=bool, dest="Logging", help="是否开启日志")
-parser.add_argument('-t', type=str, dest="LLM_Type", help="选择使用的大模型")
-args = parser.parse_args()
-os.environ['wenda_'+'Config'] = args.Config
-os.environ['wenda_'+'Port'] = str(args.Port)
-os.environ['wenda_'+'Logging'] = str(args.Logging)
-os.environ['wenda_'+'LLM_Type'] = str(args.LLM_Type)
-
-from common import success_print
+from common import success_print, error_print
 from common import error_helper
 from common import settings
 from common import CounterLock
@@ -43,7 +31,7 @@ root_path_list = source_folder_path.split(os.sep)
 docs = []
 vectorstore = None
 
-model_path = settings.library.rtst.Model_Path
+model_path = settings.librarys.rtst.model_path
 try:
     embeddings = HuggingFaceEmbeddings(model_name='')
     embeddings.client = sentence_transformers.SentenceTransformer(
@@ -69,15 +57,19 @@ def clac_embedding(texts, embeddings, metadatas):
 
 def make_index():
     global docs
-    text_splitter = CharacterTextSplitter(
-        chunk_size=20, chunk_overlap=0, separator='\n')
+    if hasattr(settings.librarys.rtst,"size") and hasattr(settings.librarys.rtst,"overlap"):
+        text_splitter = CharacterTextSplitter(
+            chunk_size=int(settings.librarys.rtst.size), chunk_overlap=int(settings.librarys.rtst.overlap), separator='\n')
+    else:
+        text_splitter = CharacterTextSplitter(
+            chunk_size=20, chunk_overlap=0, separator='\n')
     doc_texts = text_splitter.split_documents(docs)
     docs = []
     texts = [d.page_content for d in doc_texts]
     metadatas = [d.metadata for d in doc_texts]
     thread = threading.Thread(target=clac_embedding, args=(texts, embeddings, metadatas))
     thread.start()
-    while embedding_lock.get_waiting_threads()>1:
+    while embedding_lock.get_waiting_threads()>2:
         time.sleep(0.1)
 
 all_files=[]
@@ -91,33 +83,52 @@ for i in range(len(all_files)):
     root, file=all_files[i]
     data = ""
     title = ""
-    if file.endswith(".pdf"):
+    try:
         file_path = os.path.join(root, file)
-        with pdfplumber.open(file_path) as pdf:
-            data_list = []
-            for page in pdf.pages:
-                data_list.append(page.extract_text())
-            data = "\n".join(data_list)
-    else:
-        # txt
-        file_path = os.path.join(root, file)
-        with open(file_path, 'rb') as f:
-            b = f.read()
-            result = chardet.detect(b)
-        with open(file_path, 'r', encoding=result['encoding']) as f:
-            data = f.read()
-    data = re.sub(r'[\n\r]+', "", data)
+        _, ext = os.path.splitext(file_path)
+        if ext.lower() == '.pdf':
+            #pdf
+            with pdfplumber.open(file_path) as pdf:
+                data_list = []
+                for page in pdf.pages:
+                    print(page.extract_text())
+                    data_list.append(page.extract_text())
+                data = "\n".join(data_list)
+        elif ext.lower() == '.txt':
+            # txt
+            with open(file_path, 'rb') as f:
+                b = f.read()
+                result = chardet.detect(b)
+            with open(file_path, 'r', encoding=result['encoding']) as f:
+                data = f.read()
+        else:
+            print("目前还不支持文件格式：", ext)
+    except Exception as e:
+        print("文件读取失败，当前文件已被跳过：",file,"。错误信息：",e)
     data = re.sub(r'！', "！\n", data)
     data = re.sub(r'：', "：\n", data)
     data = re.sub(r'。', "。\n", data)
+    data = re.sub(r'\r', "\n", data)
+    data = re.sub(r'\n\n', "\n", data)
+    data = re.sub(r"\n\s*\n", "\n", data)
     length_of_read+=len(data)
     docs.append(Document(page_content=data, metadata={"source": file}))
     if length_of_read > 1e5:
         success_print("处理进度",int(100*i/len(all_files)),f"%\t({i}/{len(all_files)})")
         make_index()
+        # print(embedding_lock.get_waiting_threads())
         length_of_read=0
+
+
+if len(all_files) == 0:
+    error_print("txt 目录没有数据")
+    sys.exit(0)
+
 if len(docs) > 0:
     make_index()
+
+while embedding_lock.get_waiting_threads()>0:
+    time.sleep(0.1)
 with embedding_lock:
     time.sleep(0.1)
     with vectorstore_lock:
