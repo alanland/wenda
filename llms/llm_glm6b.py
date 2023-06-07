@@ -24,16 +24,16 @@ def chat_one(prompt, history_formatted, max_length, top_p, temperature, zhishiku
         yield response
 
 def sum_values(dict):
-  total = 0
-  for value in dict.values():
-    total += value
-  return total
+    total = 0
+    for value in dict.values():
+        total += value
+    return total
 
 def dict_to_list(d):
-  l = []
-  for k, v in d.items():
-    l.extend([k] * v)
-  return l
+    l = []
+    for k, v in d.items():
+        l.extend([k] * v)
+    return l
 
 def load_model():
     global model, tokenizer
@@ -123,7 +123,7 @@ def load_model():
 
 
 from bottle import route, response, request
-@route('/api/lora_load_adapter', method=("POST","OPTIONS"))
+@route('/lora_load_adapter', method=("POST","OPTIONS"))
 def load_adapter():
     # allowCROS()
     try:
@@ -134,7 +134,7 @@ def load_adapter():
         return "保存成功"
     except Exception as e:
         return str(e)
-@route('/api/lora_set_adapter', method=("POST","OPTIONS"))
+@route('/lora_set_adapter', method=("POST","OPTIONS"))
 def set_adapter():
     # allowCROS()
     try:
