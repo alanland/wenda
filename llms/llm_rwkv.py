@@ -5,29 +5,44 @@ from copy import deepcopy
 import threading
 import time
 import math
+import re
+from typing import List,Dict
 interface = ":"
-if settings.llm.path.lower().find("world") > -1:
-    print("rwkv world mode!")
+if settings.llm.path.lower().find("chntuned") > -1:
+    print("RWKV CHNtuned mode")
+    tokenizers_type = "world"
+    user = "User"
+    answer = "Assistant"
+    tokenizers_file = "rwkv_vocab_v20230424"
+elif settings.llm.path.lower().find("world") > -1:
+    print("RWKV world mode")
+    tokenizers_type = "world"
     user = "Question"
     answer = "Answer"
     tokenizers_file = "rwkv_vocab_v20230424"
 else:
+    tokenizers_type = "20B"
     user = "Bob"
     answer = "Alice"
     tokenizers_file = "20B_tokenizer.json"
 
 states = {}
 
+presencePenalty = 0.2
+countPenalty = 0.2
+if settings.llm.presence_penalty:
+    presencePenalty=settings.llm.presence_penalty
+if settings.llm.count_penalty:
+    countPenalty=settings.llm.count_penalty
 
 class State(object):
     def __init__(self, state):
-        self.state = [tensor.cpu() for tensor in state] if device != torch.device(
-            "cpu") else deepcopy(state)
+        self.state = [tensor.cpu() for tensor in state] if device != "cpu" else state
         self.touch()
 
     def get(self):
         self.touch()
-        return [tensor.to(device) for tensor in self.state] if device != torch.device("cpu") else self.state
+        return [tensor.to(device) for tensor in self.state] if device != "cpu" else deepcopy(self.state)
 
     def touch(self):
         self.time = time.time()
@@ -44,22 +59,23 @@ def gc_states():
             del states[oldest[1]]
 
 
-# thread_load_model = threading.Thread(target=gc_states)
-# thread_load_model.start()
+thread_load_model = threading.Thread(target=gc_states)
+thread_load_model.start()
 
-device = 'cuda:0'
+device = settings.llm.state_source_device or 'cpu'
 if settings.llm.strategy.startswith("Q"):
     runtime = "cpp"
 
     from typing import Optional
     import tokenizers
     from llms.rwkvcpp.sampling import sample_logits
+    from llms.rwkvcpp.rwkv_tokenizer import get_tokenizer
     logits: Optional[torch.Tensor] = None
     state: Optional[torch.Tensor] = None
 
     END_OF_LINE_TOKEN: int = 187
 
-    def process_tokens(_tokens: list[int], new_line_logit_bias: float = 0.0) -> None:
+    def process_tokens(_tokens: List[int], new_line_logit_bias: float = 0.0) -> None:
         global logits, state
 
         for _token in _tokens:
@@ -90,11 +106,9 @@ if settings.llm.strategy.startswith("Q"):
             logits = None
             return history
 
-    def chat_one(prompt, history, max_length, top_p, temperature, zhishiku=False):
+    def chat_one(prompt, history, max_length, top_p, temperature, data):
         global state, resultChat, token_stop, logits
         token_count = max_length
-        presencePenalty = 0.2
-        countPenalty = 0.2
         token_stop = [0]
 
         resultChat = ""
@@ -110,11 +124,11 @@ if settings.llm.strategy.startswith("Q"):
         new = ctx.strip()
         print(f'{new}', end='')
 
-        process_tokens(tokenizer.encode(new).ids,
+        process_tokens(tokenizer_encode(new),
                        new_line_logit_bias=-999999999)
 
-        accumulated_tokens: list[int] = []
-        token_counts: dict[int, int] = {}
+        accumulated_tokens: List[int] = []
+        token_counts: Dict[int, int] = {}
 
         for i in range(int(token_count)):
             for n in token_counts:
@@ -158,10 +172,11 @@ if settings.llm.strategy.startswith("Q"):
 
     model = None
     state = None
-    tokenizer = None
+    tokenizer_encode = None
 
     def load_model():
-        global model, tokenizer
+        global model, tokenizer, tokenizer_encode
+
 
         from llms.rwkvcpp.rwkv_cpp_shared_library import load_rwkv_shared_library
         library = load_rwkv_shared_library()
@@ -173,8 +188,9 @@ if settings.llm.strategy.startswith("Q"):
             model = RWKVModel(library, settings.llm.path, cpu_count)
         except:
             model = RWKVModel(library, settings.llm.path)
-        print('Loading 20B tokenizer')
-        tokenizer = tokenizers.Tokenizer.from_file(tokenizers_file)
+        #print('Loading 20B tokenizer')
+        #tokenizer = tokenizers.Tokenizer.from_file(tokenizers_file)
+        tokenizer , tokenizer_encode = get_tokenizer(tokenizers_type)
 
 
 else:
@@ -183,20 +199,27 @@ else:
     def chat_init(history):
         tmp = []
         # print(history)
+        raw_mode=False
         for i, old_chat in enumerate(history):
             if old_chat['role'] == "user":
-                tmp.append(f"{user}{interface} "+old_chat['content'])
+                if old_chat['content'].startswith("raw!"):
+                    raw_mode=True
+                    tmp.append(old_chat['content'])
+                else:
+                    raw_mode=False
+                    tmp.append(f"{user}{interface} "+old_chat['content'])
             elif old_chat['role'] == "AI":
-                tmp.append(f"{answer}{interface} "+old_chat['content'])
+                if raw_mode:
+                    tmp[-1]+=old_chat['content']
+                else:
+                    tmp.append(f"{answer}{interface} "+old_chat['content'])
             else:
                 continue
         history = '\n\n'.join(tmp)
         return history
 
-    def chat_one(prompt, history, max_length, top_p, temperature, zhishiku=False):
+    def chat_one(prompt, history, max_length, top_p, temperature, data):
         token_count = max_length
-        presencePenalty = 0.4
-        countPenalty = 0.4
         if history is None or history == "":
             history = ""
         else:
@@ -210,24 +233,33 @@ else:
         if prompt.startswith("raw!"):
             print("[raw mode]", end="")
             ctx = prompt.replace("raw!", "")
+            ctx = re.sub('\\{user\\}',user, ctx)
+            ctx = re.sub('\\{answer\\}',answer, ctx)
+            ctx = re.sub('\\{bot\\}',answer, ctx)
+            ctx = re.sub('\\{interface\\}',interface, ctx)
+            raw_mode=True
         else:
             ctx = f"{user}{interface} {prompt}\n\n{answer}{interface}"
+            raw_mode=False
         # print(ctx)
         state = None
+        history_in_ctx=False
         try:
             state = states[history].get()
             print("[match state]", end="")
         except Exception as e:
             ctx = history+ctx
+            history_in_ctx=True
             print("[default stste]", end="")
-
-            state = default_state
+            if not raw_mode:
+                state = states['default'].get()
+            # print([history],states)
         all_tokens = []
         out_last = 0
-        response = ''
         occurrence = {}
         tokens = pipeline.encode(ctx)
-        yield str(len(ctx))+'字正在计算\n'+str(len(tokens))+"tokens"
+        response = ''
+        yield str(len(ctx))+'字正在计算\n'+str(len(tokens))+" tokens"
         for i in range(int(token_count)):
             out, state = model.forward(tokens if i == 0 else [token], state)
             for n in args.token_ban:
@@ -241,6 +273,8 @@ else:
             if token in args.token_stop:
                 break
             all_tokens += [token]
+            for occurrence_i in occurrence:
+                occurrence[occurrence_i]*=0.996
             if token not in occurrence:
                 occurrence[token] = 1
             else:
@@ -249,19 +283,24 @@ else:
             tmp = pipeline.decode(all_tokens[out_last:])
             if '\ufffd' not in tmp:
                 response += tmp
-                if response.endswith('\n\n') or response.endswith(f"{user}{interface}") or response.endswith(f"{answer}{interface}"):
+                if response.endswith('\n\n') or response.endswith(f"{user}{interface}"):
                     response = remove_suffix(
-                        remove_suffix(
-                            remove_suffix(
-                                remove_suffix(response, f"{user}{interface}"), f"{answer}{interface}"),
-                            '\n'),
-                        '\n')
+                        remove_suffix(response, '\n\n'),
+                        f"{user}{interface}"
+                    )
                     break
                 # print(tmp, end='')
                 out_last = i + 1
                 yield response.strip()
         yield response.strip()
-        states[history+ctx+' '+response.strip()+'\n\n'] = State(state)
+        if raw_mode:
+            if not history_in_ctx:
+                prompt=history+prompt
+            states[prompt+response.strip()+'\n\n'] = State(state)
+        else:
+            if not history_in_ctx:
+                ctx=history+ctx
+            states[ctx+' '+response.strip()+'\n\n'] = State(state)
 
     def remove_suffix(input_string, suffix):  # 兼容python3.8
         if suffix and input_string.endswith(suffix):
@@ -271,7 +310,6 @@ else:
     pipeline = None
     PIPELINE_ARGS = None
     model = None
-    default_state = None
 
     def load_model():
         global pipeline, PIPELINE_ARGS, model
@@ -297,6 +335,7 @@ else:
 
         out, state = model.forward(pipeline.encode(f'''{user}{interface} hi
 
-{answer}{interface} Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.'''), None)
-        global default_state
-        default_state = state
+{answer}{interface} Hi. I am your assistant and I will provide expert full response in full details. Please feel free to ask any question and I will always answer it.
+
+'''), None)
+        states['default'] = State(state)

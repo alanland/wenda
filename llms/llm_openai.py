@@ -1,12 +1,13 @@
 import os
 import openai
+from plugins.common import settings
 
 
 def chat_init(history):
     return history
 
 
-def chat_one(prompt, history_formatted, max_length, top_p, temperature, zhishiku=False):
+def chat_one(prompt, history_formatted, max_length, top_p, temperature, data):
     history_data = [ {"role": "system", "content": "You are a helpful assistant."}]
     if history_formatted is not None:
         for i, old_chat in enumerate(history_formatted):
@@ -36,8 +37,7 @@ chatCompletion = None
 
 def load_model():
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    #openai.api_base = "https://api.openai.com/v1"
-    openai.api_base = "https://gpt.lucent.blog/v1"
+    openai.api_base = settings.llm.api_host
 
 class Lock:
     def __init__(self):

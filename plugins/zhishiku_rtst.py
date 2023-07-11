@@ -36,7 +36,7 @@ def get_title_by_doc(doc):
 def get_doc(id,score,step,memory_name):
     doc = get_doc_by_id(id,memory_name)
     final_content=doc.page_content
-    print("文段分数：",score,[doc.page_content])
+    # print("文段分数：",score,[doc.page_content])
     if step > 0:
         for i in range(1, step+1):
             try:
@@ -65,7 +65,7 @@ def find(s,step = 0,memory_name="default"):
         for j, i in enumerate(indices[0]):
             if i == -1:
                 continue
-            if scores[0][j]>700:continue
+            if scores[0][j]>260:continue
             docs.append(get_doc(i,scores[0][j],step,memory_name))
 
         return docs
@@ -148,6 +148,11 @@ def api_find():
         return json.dumps(find(prompt,int(step),memory_name))
     except Exception as e:
         return str(e)
+    
+@route('/list_rtst_in_disk', method=("POST","OPTIONS"))
+def api_find():
+    allowCROS()
+    return json.dumps(os.listdir('memory'))
     
 @route('/del_rtst_in_memory', method=("POST","OPTIONS"))
 def api_find():

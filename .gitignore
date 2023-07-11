@@ -1,6 +1,7 @@
 .idea
 __pycache__
 model
+vc
 txt2
 testdb.db
 *.baiduyun.uploading.cfg
@@ -27,3 +28,4 @@ config.yml
 memory
 .history
 *.zip
+autos/inner.js
