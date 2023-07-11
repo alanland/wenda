@@ -78,9 +78,9 @@ def load_model():
     device, precision = s[0][0], s[0][1]
 
     tokenizer = AutoTokenizer.from_pretrained(
-        settings.llm.path, local_files_only=True, trust_remote_code=True,revision="v1.1.0")
+        settings.llm.path, local_files_only=False, trust_remote_code=True,revision="v1.1.0")
     model = AutoModel.from_pretrained(
-        settings.llm.path, local_files_only=True, trust_remote_code=True, revision="v1.1.0")
+        settings.llm.path, local_files_only=False, trust_remote_code=True, revision="v1.1.0")
     if not (settings.llm.lora == '' or settings.llm.lora == None):
         print('Lora模型地址', settings.llm.lora)
         from peft import PeftModel
