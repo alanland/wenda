@@ -85,7 +85,7 @@ llm_models:
      historymode: state
      #rwkv历史记录实现方式：state、string
   glm6b: 
-     path: "THUDM/chatglm-6b-int4"
+     path: "THUDM/chatglm2-6b"
      #glm模型位置"
      strategy: "cuda fp16"
      #cuda fp16	 所有glm模型 要直接跑在gpu上都可以使用这个参数
