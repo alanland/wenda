@@ -74,6 +74,7 @@ def find(s,step = 0,memory_name="default"):
         return []
 try:
     embeddings = HuggingFaceEmbeddings(model_name='')
+    error_helper('load embeddings: ',cunnrent_setting.model_path)
     embeddings.client = sentence_transformers.SentenceTransformer(cunnrent_setting.model_path,
                                                                             device=cunnrent_setting.device)
 except Exception  as e:
