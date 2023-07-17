@@ -1,7 +1,7 @@
 
 logging: False
 #日志"
-port: 17860
+port: 17862
 #webui 默认启动端口号"
 library:
      strategy: "calc:2 rtst:2 agents:0"
