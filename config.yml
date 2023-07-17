@@ -48,14 +48,16 @@ librarys:
      #分块大小"
      overlap: 0
      #分块重叠长度
-     model_path: "GanymedeNil/text2vec-large-chinese"
+     #model_path: "GanymedeNil/text2vec-large-chinese"
+     model_path: "Howardxuan/m3e-base"
      #向量模型存储路径
      device: cpu
      #embedding运行设备
   qdrant: 
      path: txt
      #知识库文本路径
-     model_path: "GanymedeNil/text2vec-large-chinese"
+    # model_path: "GanymedeNil/text2vec-large-chinese"
+     model_path: "Howardxuan/m3e-base"
      #向量模型存储路径
      qdrant_host: "http://localhost:6333"
      #qdrant服务地址"
